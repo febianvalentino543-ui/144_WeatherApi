@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consume API MapTiler - Web Service</title>
+    <!-- Font Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background-color: #1e2436;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .card {
+            background-color: #ffffff;
+            width: 100%;
+            max-width: 440px;
+            border-radius: 12px;
+            padding: 30px 25px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        .card-header {
+            font-size: 11px;
+            font-weight: 700;
+            color: #333;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .user-info {
+            margin-bottom: 25px;
+        }
+
+        .user-info .name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #222;
+        }
+
+        .user-info .nim {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 25px;
+        }
+
+        .search-container input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .search-container input:focus {
+            border-color: #1e2436;
+        }
+
+        .search-container button {
+            background-color: #1e2436;
+            color: #ffffff;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .search-container button:hover {
+            background-color: #2c354d;
+        }
+
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: left;
+        }
+
+        .result-table tr {
+            border-bottom: 1px solid #eee;
+        }
+
+        .result-table tr:last-child {
+            border-bottom: none;
+        }
+
+        .result-table td {
+            padding: 12px 0;
+            vertical-align: top;
+        }
+
+        .label {
+            font-weight: 600;
+            color: #444;
+            width: 40%;
+            text-transform: UPPERCASE;
+            font-size: 11px;
+        }
+
+        .value {
+            color: #222;
+            text-align: right;
+            font-weight: 500;
+        }
+
+        .error-message {
+            color: #d9534f;
+            font-size: 12px;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <!-- Header Informasi Praktikum -->
+        <div class="card-header">PWS &bull; Web Service API</div>
+
+        <div class="user-info">
+            <div class="name">Febian Valentino</div>
+            <div class="nim">20250140144</div>
+        </div>
+
+        <!-- Form Pencarian Lokasi -->
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Masukkan nama lokasi (contoh: Semarang)" onkeypress="if(event.key === 'Enter') handleSearch()">
+            <button onclick="handleSearch()">Search</button>
+        </div>
+
+        <div id="errorMessage" class="error-message">Data lokasi tidak ditemukan!</div>
+
+        <!-- Tabel Hasil Data API -->
+        <table class="result-table" id="resultTable" style="display: none;">
+            <tr>
+                <td class="label">PLACE NAME</td>
+                <td class="value" id="resPlaceName">-</td>
+            </tr>
+            <tr>
+                <td class="label">NEGARA</td>
+                <td class="value" id="resCountry">-</td>
+            </tr>
+            <tr>
+                <td class="label">PROVINSI</td>
+                <td class="value" id="resProvince">-</td>
+            </tr>
+            <tr>
+                <td class="label">KECAMATAN / KOTA</td>
+                <td class="value" id="resDistrict">-</td>
+            </tr>
+            <tr>
+                <td class="label">KOORDINAT (LNG, LAT)</td>
+                <td class="value" id="resCoordinates">-</td>
+            </tr>
+        </table>
+    </div>
+
+    <script>
+        async function handleSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            const resultTable = document.getElementById('resultTable');
+            const errorMessage = document.getElementById('errorMessage');
+
+            if (!query) {
+                alert('Silakan masukkan nama lokasi terlebih dahulu!');
+                return;
+            }
+
+            errorMessage.style.display = 'none';
+
+            try {
+                // Memanggil endpoint backend app.js
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.details?.message || data.error || 'Terjadi kesalahan pada server');
+                }
+
+                if (data.features && data.features.length > 0) {
+                    const feature = data.features[0];
+
+                    // Ekstraksi Koordinat
+                    let lng = 0, lat = 0;
+                    if (feature.center) {
+                        [lng, lat] = feature.center;
+                    } else if (feature.geometry && feature.geometry.coordinates) {
+                        [lng, lat] = feature.geometry.coordinates;
+                    }
+
+                    let country = '-';
+                    let province = '-';
+                    let district = feature.text || '-';
+
+                    // Ekstraksi hirarki wilayah dari response MapTiler API
+                    if (feature.context) {
+                        feature.context.forEach(ctx => {
+                            const ctxId = ctx.id || '';
+                            if (ctxId.startsWith('country')) {
+                                country = ctx.text;
+                            } else if (ctxId.startsWith('province') || ctxId.startsWith('region')) {
+                                province = ctx.text;
+                            } else if (
+                                ctxId.startsWith('district') || 
+                                ctxId.startsWith('locality') || 
+                                ctxId.startsWith('place') || 
+                                ctxId.startsWith('subregion') || 
+                                ctxId.startsWith('municipality')
+                            ) {
+                                district = ctx.text;
+                            }
+                        });
+                    }
+
+                    // Tampilkan data ke elemen UI
+                    document.getElementById('resPlaceName').textContent = feature.place_name || feature.text || query;
+                    document.getElementById('resCountry').textContent = country;
+                    document.getElementById('resProvince').textContent = province;
+                    document.getElementById('resDistrict').textContent = district;
+                    document.getElementById('resCoordinates').textContent = `${lng.toFixed(5)}, ${lat.toFixed(5)}`;
+
+                    resultTable.style.display = 'table';
+                } else {
+                    resultTable.style.display = 'none';
+                    errorMessage.textContent = 'Lokasi tidak ditemukan!';
+                    errorMessage.style.display = 'block';
+                }
+            } catch (err) {
+                console.error(err);
+                resultTable.style.display = 'none';
+                errorMessage.textContent = err.message || 'Terjadi kesalahan saat mengambil data API!';
+                errorMessage.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>
